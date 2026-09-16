@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  fastapi-backend:
+    build: ./backend
+    container_name: clearflow-backend
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8000"
+    networks:
+      - clearflow-net
+
+  vue-frontend:
+    build: ./frontend
+    container_name: clearflow-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - clearflow-net
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: clearflow-n8n
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://localhost/n8n/}
+      - GENERIC_TIMEZONE=Asia/Kolkata
+    expose:
+      - "5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/workflows:ro
+    networks:
+      - clearflow-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: clearflow-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - fastapi-backend
+      - vue-frontend
+      - n8n
+    networks:
+      - clearflow-net
+
+networks:
+  clearflow-net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+
+# NOTE: NocoDB is intentionally NOT included in this compose file — connect
+# NOCODB_BASE_URL in .env to your own self-hosted or cloud NocoDB instance,
+# built per docs/NOCODB_SCHEMA.md.

@@ -1,0 +1,67 @@
+{
+  "name": "ClearFlow - Pre-Due Reminder (D-2)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }]
+        }
+      },
+      "name": "Daily 9AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_URL}}/api/chittis",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Cookie", "value": "={{$env.SERVICE_SESSION_COOKIE}}" }]
+        }
+      },
+      "name": "Fetch All Chittis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300],
+      "notes": "Iterate chittis; for each, compute whether today == Cycle_Anchor_Day - 2, using Current_Active_Month's spawn date."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filters chittis whose cycle anchor day is exactly 2 days from today.\n// Cycle_Anchor_Day is one of: 1st, 5th, 10th, 15th, 20th, 25th.\nconst today = new Date();\nconst targetDay = new Date(today);\ntargetDay.setDate(today.getDate() + 2);\nconst dayNum = targetDay.getDate();\n\nconst anchorMap = { '1st':1, '5th':5, '10th':10, '15th':15, '20th':20, '25th':25 };\n\nreturn $input.all().filter(item => {\n  const chitti = item.json;\n  return anchorMap[chitti.Cycle_Anchor_Day] === dayNum;\n}).map(item => ({ json: item.json }));"
+      },
+      "name": "Filter Matching Anchor Day",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_URL}}/api/whatsapp/broadcast",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chitti_id", "value": "={{$json.Chitti_ID}}" },
+            { "name": "target", "value": "all_shares" },
+            { "name": "message_type", "value": "pre_due" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Cookie", "value": "={{$env.SERVICE_SESSION_COOKIE}}" }]
+        }
+      },
+      "name": "Broadcast Pre-Due Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Daily 9AM Trigger": { "main": [[{ "node": "Fetch All Chittis", "type": "main", "index": 0 }]] },
+    "Fetch All Chittis": { "main": [[{ "node": "Filter Matching Anchor Day", "type": "main", "index": 0 }]] },
+    "Filter Matching Anchor Day": { "main": [[{ "node": "Broadcast Pre-Due Reminder", "type": "main", "index": 0 }]] }
+  }
+}

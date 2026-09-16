@@ -1,0 +1,18 @@
+{$DOMAIN:localhost} {
+    # Backend API
+    handle /api/* {
+        reverse_proxy fastapi-backend:8000
+    }
+
+    # n8n automation engine — protect this route with basic auth or a firewall rule
+    handle /n8n/* {
+        reverse_proxy n8n:5678
+    }
+
+    # Vue.js PWA frontend (catch-all)
+    handle {
+        reverse_proxy vue-frontend:80
+    }
+
+    encode gzip
+}
