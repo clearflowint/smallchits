@@ -45,8 +45,13 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        printf ':80 {\n  handle /api/* {\n    reverse_proxy fastapi-backend:8000\n  }\n  handle /n8n/* {\n    reverse_proxy n8n:5678\n  }\n  handle {\n    reverse_proxy vue-frontend:80\n  }\n  encode gzip\n}\n' > /tmp/Caddyfile
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
